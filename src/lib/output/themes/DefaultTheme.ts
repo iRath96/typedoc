@@ -122,13 +122,11 @@ export class DefaultTheme extends Theme
             urls.push(new UrlMapping('index.html',   project, 'index.hbs'));
         }
 
-        if (entryPoint.children) {
-            entryPoint.children.forEach((child:Reflection) => {
-                if (child instanceof DeclarationReflection) {
-                    DefaultTheme.buildUrls(child, urls);
-                }
-            });
-        }
+        entryPoint.getChildrenAndReExports().forEach((child:Reflection) => {
+            if (child instanceof DeclarationReflection) {
+                DefaultTheme.buildUrls(child, urls);
+            }
+        });
 
         return urls;
     }
@@ -203,8 +201,9 @@ export class DefaultTheme extends Theme
          */
         function includeDedicatedUrls(reflection:DeclarationReflection, item:NavigationItem) {
             (function walk(reflection:DeclarationReflection) {
-                for (var key in reflection.children) {
-                    var child = reflection.children[key];
+                var children = reflection.getChildrenAndReExports();
+                for (var key in children) {
+                    var child = children[key];
                     if (child.hasOwnDocument && !child.kindOf(ReflectionKind.SomeModule)) {
                         if (!item.dedicatedUrls) item.dedicatedUrls = [];
                         item.dedicatedUrls.push(child.url);
@@ -382,8 +381,10 @@ export class DefaultTheme extends Theme
 
             reflection.url = url;
             reflection.hasOwnDocument = true;
-            for (var key in reflection.children) {
-                var child = reflection.children[key];
+
+            var children = reflection.getChildrenAndReExports();
+            for (var key in children) {
+                var child = children[key];
                 if (mapping.isLeaf) {
                     DefaultTheme.applyAnchorUrl(child, reflection);
                 } else {

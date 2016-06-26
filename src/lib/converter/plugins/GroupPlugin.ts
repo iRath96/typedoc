@@ -94,9 +94,10 @@ export class GroupPlugin extends ConverterComponent
 
         if (reflection instanceof ContainerReflection) {
             var container = <ContainerReflection>reflection;
-            if (container.children && container.children.length > 0) {
-                container.children.sort(GroupPlugin.sortCallback);
-                container.groups = GroupPlugin.getReflectionGroups(container.children);
+            var children = container.getChildrenAndReExports();
+            if (children.length > 0) {
+                children.sort(GroupPlugin.sortCallback);
+                container.groups = GroupPlugin.getReflectionGroups(children);
             }
         }
     }

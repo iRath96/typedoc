@@ -1,4 +1,4 @@
-import {Reflection, ReflectionKind, ITraverseCallback, TraverseProperty} from "./abstract";
+import {Reflection, ReflectionKind, ReflectionFlag, ITraverseCallback, TraverseProperty} from "./abstract";
 import {ReflectionGroup} from "../ReflectionGroup";
 import {DeclarationReflection} from "./declaration";
 
@@ -9,7 +9,52 @@ export class ContainerReflection extends Reflection
      * The children of this reflection.
      */
     children:DeclarationReflection[];
+    
+    /**
+     * The re-exported modules identified by their absolute paths.
+     */
+    wildcardImports:string[];
+    
+    /**
+     * Returns children and re-exports from other modules.
+     */
+    getChildrenAndReExports() {
+        var root: Reflection = this;
+        while(!root.isProject())
+            root = root.parent;
 
+        var moduleMap = (<ContainerReflection>root).children.reduce((hash, child) => {
+            if(child instanceof ContainerReflection)
+                hash[child.originalName] = child;
+            return hash;
+        }, <{[originalName:string]:ContainerReflection}>{})
+
+        var children = (this.children || []).concat([]);
+        (this.wildcardImports || []).forEach(wildcardImport => {
+            var reflection = moduleMap[wildcardImport];
+            if(!reflection)
+                throw new Error("Re-exported module not found");
+            
+            var exportedChildren = reflection.getChildrenAndReExports().filter(child =>
+               child.flags.isExported 
+            );
+            
+            children = children.concat(exportedChildren.map(child => {
+                var copy:DeclarationReflection = <any>{};
+                for(var i in child)
+                    copy[i] = child[i];
+
+                copy.setFlag(ReflectionFlag.Exported, true);
+                copy.setFlag(ReflectionFlag.ExportAssignment, true);
+                // copy.inheritedFrom = 
+
+                return copy;
+            }));
+        });
+
+        return children;
+    }
+    
     /**
      * All children grouped by their kind.
      */
@@ -18,15 +63,16 @@ export class ContainerReflection extends Reflection
 
 
     /**
-     * Return a list of all children of a certain kind.
+     * Return a list of all children and re-exports of a certain kind.
      *
      * @param kind  The desired kind of children.
      * @returns     An array containing all children with the desired kind.
      */
     getChildrenByKind(kind:ReflectionKind):DeclarationReflection[] {
         var values:DeclarationReflection[] = [];
-        for (var key in this.children) {
-            var child = this.children[key];
+        var children = this.getChildrenAndReExports();
+        for (var key in children) {
+            var child = children[key];
             if (child.kindOf(kind)) {
                 values.push(child);
             }
@@ -36,7 +82,7 @@ export class ContainerReflection extends Reflection
 
 
     /**
-     * Traverse all potential child reflections of this reflection.
+     * Traverse all potential child reflections of this reflection including re-exports.
      *
      * The given callback will be invoked for all children, signatures and type parameters
      * attached to this reflection.
@@ -44,11 +90,10 @@ export class ContainerReflection extends Reflection
      * @param callback  The callback function that should be applied for each child reflection.
      */
     traverse(callback:ITraverseCallback) {
-        if (this.children) {
-            this.children.forEach((child:DeclarationReflection) => {
-                callback(child, TraverseProperty.Children);
-            });
-        }
+        var children = this.getChildrenAndReExports();
+        children.forEach((child:DeclarationReflection) => {
+            callback(child, TraverseProperty.Children);
+        });
     }
 
 

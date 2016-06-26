@@ -1,4 +1,4 @@
-import {Reflection, ReflectionKind, ProjectReflection, DeclarationReflection} from "../../models/reflections/index";
+import {Reflection, ReflectionKind, ProjectReflection, DeclarationReflection,ContainerReflection} from "../../models/reflections/index";
 import {Component, RendererComponent} from "../components";
 import {PageEvent} from "../events";
 import {NavigationItem} from "../models/NavigationItem";
@@ -54,7 +54,9 @@ export class TocPlugin extends RendererComponent
      */
     static buildToc(model:Reflection, trail:Reflection[], parent:NavigationItem) {
         var index = trail.indexOf(model);
-        var children = model['children'] || [];
+        var children = [];
+        if(model instanceof ContainerReflection)
+            children = model.getChildrenAndReExports();
 
         if (index < trail.length - 1 && children.length > 40) {
             var child = trail[index + 1];
